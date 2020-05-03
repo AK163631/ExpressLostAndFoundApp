@@ -1,5 +1,10 @@
 const UserConnection = require("./utils/userConnection")
 const TemplatingEngine = require("./utils/templatingEngine")
+const RegisteredItem = require("./utils/registeredItem")
+const {Item} = require("./model/item")
+
+const fileUpload = require('express-fileupload');
+const fs = require('fs')
 
 var createError = require('http-errors');
 var express = require('express');
@@ -11,9 +16,38 @@ var mongoose = require("mongoose")
 var usersRouter = require('./routes/users');
 
 const DB_CONNECTION_STRING = 'mongodb+srv://dbAdmin:Pass1word@course-work-dzlrh.mongodb.net/test?retryWrites=true&w=majority'
-let sessions = {}
-let items = []
+let sessions = {} // {id: user}
 
+let items = function () {
+    Item.find({}, function (err, allItems) {
+        let items_ = {}
+        if (err) throw err
+        // loop through db objects
+        for (let item in allItems) {
+            let itemOBJ = new RegisteredItem(item.category, item.timeFound, item.location, item.description, null)
+            if (fs.existsSync(itemOBJ.filePath)) {
+                items_[itemOBJ.id] = itemOBJ
+            } else {
+                Item.deleteOne(item, () => {
+                    if (err) console.log(err);
+                })
+            }
+        }
+        fs.readdir(__dirname + "/webroot/static/images", function (err, files) {
+            if (err) throw err
+            files.forEach(function (file, index) {
+                if (!path.basename(file).split(".jpg").pop() in items_) {
+                    // file id not in database
+                    fs.unlinkSync(file)
+                }
+            })
+        })
+        return items
+    })
+    // TODO load items from database
+}() // {id: item}
+let requests = {} // item : user
+console.log(items)
 mongoose.connect(DB_CONNECTION_STRING)
     .then(() => console.log("DB Connected"))
     .catch(error => console.log(error))
@@ -21,6 +55,7 @@ mongoose.connect(DB_CONNECTION_STRING)
 
 var app = express();
 
+app.use(fileUpload());
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({extended: false}));
@@ -29,15 +64,14 @@ app.use(cookieParser());
 app.use('/users', usersRouter);
 app.use(express.static(__dirname + '/webroot'))
 
-
 /* serve home page */
 app.get('/', function (req, res) {
     let user = hasActiveSession(req)
     if (user) {
         // has a user session
-        sendPage(res, user.templatingEngine.generateIndexPage())
+        sendPage(res, user.templatingEngine.generateIndexPage(items))
     } else {
-        sendPage(res, TemplatingEngine.generateIndexPage())
+        sendPage(res, TemplatingEngine.generateIndexPage(items))
     }
 });
 
@@ -95,13 +129,72 @@ app.get("/logout", (req, res) => {
     res.status(200).redirect("/") // redirect to home
 });
 
-app.post("/item/*", (req, res) => {
 
+app.get("/item/:itemid", (req, res) => {
+    let user = hasActiveSession(req)
+    if (user) {
+        let id = req.params.itemid
+        if (id) {
+            if (id in items) {
+                return sendPage(res, user.templatingEngine.generateItemPage(items[id]))
+            }
+        }
+    }
+    res.status(200).redirect("/")
+
+});
+
+app.post("/item:itemid", (req, res) => {
+    let user = hasActiveSession(req)
+    if (user) {
+        let id = req.params.itemid
+        if (id) {
+            if (id in items) {
+                if (items[id] in requests) {
+                    return sendError(res, "Item already Requested")
+                }
+                requests[items[id]] = user
+                // change to info send
+                return sendError(res, "Item successfully Requested")
+            }
+        }
+        return sendError(res, "Unable To find Item Page")
+    }
+    res.status(200).redirect("/")
+});
+
+
+app.get("/add-item", (req, res) => {
+    let user = hasActiveSession(req)
+    if (user) {
+        return sendPage(res, user.templatingEngine.generateAddItemPage())
+    }
+    // ignore the request
+    res.status(200).redirect("/")
 });
 
 app.post("/add-item", (req, res) => {
-
+    if (!hasActiveSession(req)) {
+        return res.status(200).redirect("/")
+    }
+    if (!req.files || Object.keys(req.files).length === 0) {
+        return sendError(res, "No File Attached");
+    }
+    let item = new RegisteredItem(req.body.category,
+        req.body.timefound,
+        req.body.location,
+        req.body.description,
+        req.files.imgFile,
+        UserConnection.makeid(10))
+    item.registerItem((isError) => {
+        if (isError) {
+            return sendError(res, "Unable to add item")
+        }
+        items[item.id] = item // add item to local cache
+        res.status(200).redirect("/")
+    })
 });
+
 
 app.get("/request-list", (req, res) => {
     let user = hasActiveSession(req)
@@ -112,6 +205,31 @@ app.get("/request-list", (req, res) => {
     // ignore the request
     res.status(200).redirect("/")
 })
+
+app.post("/approve-request/:confirmRequest/:itemid", (req, res) => {
+    let user = hasActiveSession(req)
+    if (user) {
+        if (user.accessLevel === 0) {
+            let confirmRequest = req.params.confirmRequest
+            let itemid = req.params.itemid
+            if (confirmRequest && itemid) {
+                let item = items[itemid]
+                let requestingUser = requests[item]
+                if (confirmRequest === "true") {
+                    // remove items
+                    item.selfDelete()
+                    delete requests[item]
+                    delete items[item]
+                } else if (confirmRequest === "false") {
+                    // deny the request
+                    delete requests[item]
+                }
+                return res.status(200).redirect("/request-list")
+            }
+        }
+    }
+    res.status(200).redirect("/")
+});
 
 
 // catch 404 and forward to error handler

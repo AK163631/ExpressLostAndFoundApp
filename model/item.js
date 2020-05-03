@@ -8,10 +8,20 @@ const itemSchema = mongoose.Schema({
         unique: 1,
         trim: true
     },
-    description: {
+    category: {
         type: String,
-        required: true
+    },
+    timeFound: {
+        type: String
+    },
+    location: {
+        type: String
+    },
+    description: {
+        type: String
     }
+
+
 })
 
 const Item = mongoose.model("Item", itemSchema);
