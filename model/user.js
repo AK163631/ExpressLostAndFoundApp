@@ -1,6 +1,5 @@
 const mongoose = require("mongoose")
 const bcrypt = require("bcrypt-nodejs")
-const {Item} = require("./item")
 let ROUNDS = 10
 
 const userSchema = mongoose.Schema({
@@ -21,12 +20,7 @@ const userSchema = mongoose.Schema({
         type: Number,
         required: true,
         maxlength: 1
-    },
-
-    items: [{
-        type: Item
-    }]
-
+    }
 })
 
 userSchema.pre('save', function (next) {
@@ -46,10 +40,9 @@ userSchema.pre('save', function (next) {
 
 userSchema.methods.comparePassword = function (targetPassword, callback) {
     bcrypt.compare(targetPassword, this.password, function (err, isMatch) {
-        if (err) return callback(err, false)
-        callback(null, isMatch)
+        if (err) throw err // TODO deal with error
+        callback(isMatch)
     })
-
 }
 
 const User = mongoose.model("User", userSchema);
