@@ -1,4 +1,6 @@
 const {Item} = require("../model/item")
+const fs = require("fs")
+const path = require("path")
 
 module.exports = class RegisteredItem {
     constructor(category, timeFound, location, description, file, id) {
@@ -34,7 +36,11 @@ module.exports = class RegisteredItem {
 
     selfDelete() {
         // TODO delete from database
-        // TODO delete static image
+        Item.deleteOne({id: this.id}, (err, success) => {
+            if(err) throw err
+            fs.unlinkSync(path.join(__dirname, "../" + this.filePath))
+        })
+
     }
 
 

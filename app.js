@@ -3,13 +3,12 @@ const TemplatingEngine = require("./utils/templatingEngine")
 const RegisteredItem = require("./utils/registeredItem")
 
 const fileUpload = require('express-fileupload');
-var createError = require('http-errors');
-var express = require('express');
-var cookieParser = require('cookie-parser');
-var logger = require('morgan');
-var mongoose = require("mongoose")
+const createError = require('http-errors');
+const express = require('express');
+const cookieParser = require('cookie-parser');
+const logger = require('morgan');
+const mongoose = require("mongoose")
 
-var usersRouter = require('./routes/users');
 
 const DB_CONNECTION_STRING = 'mongodb+srv://dbAdmin:Pass1word@course-work-dzlrh.mongodb.net/test?retryWrites=true&w=majority'
 let sessions = {} // {id: user}
@@ -31,7 +30,6 @@ app.use(express.json());
 app.use(express.urlencoded({extended: false}));
 app.use(cookieParser());
 
-app.use('/users', usersRouter);
 app.use(express.static(__dirname + '/webroot'))
 
 /* serve home page */
@@ -227,17 +225,17 @@ app.use(function (req, res, next) {
 });
 
 
-// error handler
-// app.use(function (err, req, res, next) {
-//     // set locals, only providing error in development
-//     res.locals.message = err.message;
-//     console.log(err.message)
-//     res.locals.error = req.app.get('env') === 'development' ? err : {};
-//
-//     // render the error page
-//     res.status(err.status || 500);
-//     res.sendFile(__dirname + "/webroot/static-error.html");
-// });
+//error handler
+app.use(function (err, req, res, next) {
+    // set locals, only providing error in development
+    res.locals.message = err.message;
+    console.log(err.message)
+    res.locals.error = req.app.get('env') === 'development' ? err : {};
+
+    // render the error page
+    res.status(err.status || 500);
+    res.sendFile(__dirname + "/webroot/static-error.html");
+});
 
 function sendPage(res, buffer) {
     res.status(200)
