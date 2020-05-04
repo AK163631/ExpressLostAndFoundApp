@@ -9,6 +9,11 @@ module.exports = class RegisteredItem {
         this.description = description
         this.file = file
         this.filePath = "webroot/static/images/" + this.id + ".jpg"
+        this.reasonForRequest = ""
+    }
+
+    reasonForRequestSetter(val) {
+        this.reasonForRequest = val
     }
 
     registerItem(callback) {

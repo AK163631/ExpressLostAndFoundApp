@@ -1,14 +1,10 @@
 const UserConnection = require("./utils/userConnection")
 const TemplatingEngine = require("./utils/templatingEngine")
 const RegisteredItem = require("./utils/registeredItem")
-const {Item} = require("./model/item")
 
 const fileUpload = require('express-fileupload');
-const fs = require('fs')
-
 var createError = require('http-errors');
 var express = require('express');
-var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 var mongoose = require("mongoose")
@@ -18,36 +14,10 @@ var usersRouter = require('./routes/users');
 const DB_CONNECTION_STRING = 'mongodb+srv://dbAdmin:Pass1word@course-work-dzlrh.mongodb.net/test?retryWrites=true&w=majority'
 let sessions = {} // {id: user}
 
-let items = function () {
-    Item.find({}, function (err, allItems) {
-        let items_ = {}
-        if (err) throw err
-        // loop through db objects
-        for (let item in allItems) {
-            let itemOBJ = new RegisteredItem(item.category, item.timeFound, item.location, item.description, null)
-            if (fs.existsSync(itemOBJ.filePath)) {
-                items_[itemOBJ.id] = itemOBJ
-            } else {
-                Item.deleteOne(item, () => {
-                    if (err) console.log(err);
-                })
-            }
-        }
-        fs.readdir(__dirname + "/webroot/static/images", function (err, files) {
-            if (err) throw err
-            files.forEach(function (file, index) {
-                if (!path.basename(file).split(".jpg").pop() in items_) {
-                    // file id not in database
-                    fs.unlinkSync(file)
-                }
-            })
-        })
-        return items
-    })
-    // TODO load items from database
-}() // {id: item}
+let items = {}// {id: item}
 let requests = {} // item : user
-console.log(items)
+let requestReasons = {} // item: String
+
 mongoose.connect(DB_CONNECTION_STRING)
     .then(() => console.log("DB Connected"))
     .catch(error => console.log(error))
@@ -144,18 +114,22 @@ app.get("/item/:itemid", (req, res) => {
 
 });
 
-app.post("/item:itemid", (req, res) => {
+app.post("/item/:itemid", (req, res) => {
     let user = hasActiveSession(req)
     if (user) {
         let id = req.params.itemid
         if (id) {
             if (id in items) {
-                if (items[id] in requests) {
+                if (id in requests) {
                     return sendError(res, "Item already Requested")
                 }
-                requests[items[id]] = user
+                if (!req.body.reasonForRequest) {
+                    return sendError(res, "Please give reason for requesting item")
+                }
+                requestReasons[id] = req.body.reasonForRequest
+                requests[id] = user
                 // change to info send
-                return sendError(res, "Item successfully Requested")
+                return sendError(res, "Item successfully Requested, an admin will now approve or deny the request")
             }
         }
         return sendError(res, "Unable To find Item Page")
@@ -200,32 +174,47 @@ app.get("/request-list", (req, res) => {
     let user = hasActiveSession(req)
     if (user) {
         // privilege check done internally
-        return sendPage(res, user.templatingEngine.generateRequestListPage())
+        return sendPage(res, user.templatingEngine.generateRequestListPage(requests, requestReasons, items))
     }
     // ignore the request
     res.status(200).redirect("/")
 })
 
-app.post("/approve-request/:confirmRequest/:itemid", (req, res) => {
+app.get("/approve-request/:itemid", (req, res) => {
     let user = hasActiveSession(req)
     if (user) {
-        if (user.accessLevel === 0) {
+        if (user.user.accessLevel === 0) {
             let confirmRequest = req.params.confirmRequest
-            let itemid = req.params.itemid
-            if (confirmRequest && itemid) {
-                let item = items[itemid]
-                let requestingUser = requests[item]
-                if (confirmRequest === "true") {
-                    // remove items
-                    item.selfDelete()
-                    delete requests[item]
-                    delete items[item]
-                } else if (confirmRequest === "false") {
-                    // deny the request
-                    delete requests[item]
-                }
+            let itemId = req.params.itemid
+            if (itemId) {
+                let item = items[itemId]
+                let requestingUser = requests[itemId]
+                // remove items
+                item.selfDelete()
+                delete requests[itemId]
+                delete requestReasons[itemId]
+                delete items[itemId]
                 return res.status(200).redirect("/request-list")
             }
+        }
+    }
+    res.status(200).redirect("/")
+});
+
+app.get("/deny-request/:itemid", (req, res) => {
+    let user = hasActiveSession(req)
+    if (user) {
+        if (user.user.accessLevel === 0) {
+            let itemId = req.params.itemid
+            if (itemId) {
+                if (itemId in requests) {
+                    // remove items
+                    delete requests[itemId]
+                    delete requestReasons[itemId]
+                }
+
+            }
+            return res.status(200).redirect("/request-list")
         }
     }
     res.status(200).redirect("/")

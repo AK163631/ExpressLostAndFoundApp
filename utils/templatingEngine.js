@@ -22,6 +22,24 @@ const AUTHENTICATED_USER_ITEM_IMG = '<div class="col-md-4"><a href="/item/{{item
 // Add-item.html
 const ADD_ITEM_FILE = "templates/add-item.html"
 
+//admin-request-list.html
+const ADMIN_REQUESTS_LIST_FILE = "templates/admin-request-list.html"
+const REQUEST_BLOCK_HTML = '<div class="row">' +
+    '<div class="col-md-12">' +
+    '<p class="lead">User Email: {{email}}<br>Reason for Request: {{reason-for-request}}<br></p>' +
+    '</div>' +
+    '</div>' +
+    '<div class="row">' +
+    '<div class="col-md-12">' +
+    '<a class="btn btn-primary" href="/approve-request/{{item-id}}">Approve</a>' +
+    '<a class="btn btn-primary ml-1" href="/deny-request/{{item-id}}">Deny</a>' +
+    '<a class="btn btn-primary ml-1" href="/item/{{item-id}}">View Item</a>' +
+    '</div>' +
+    '</div>'
+const REQUEST_BLOCK_TAG = "{{request-block}}"
+const REASON_FOR_REQUEST_TAG = "{{reason-for-request}}"
+const EMAIL_TAG = "{{email}}"
+
 // nav bar
 const NAV_TAG = "{{nav-item}}"
 const NAV_BUTTON_TAG = "{{nav-buttons}}"
@@ -47,9 +65,20 @@ module.exports = class TemplatingEngine {
         }, ADD_ITEM_FILE))
     }
 
-    generateRequestListPage() {
+    generateRequestListPage(requests, requestReasons, items) {
         if (this.accessLevel === 0) {
-            return new Buffer("Admin only: request list page")
+            let html = ""
+            // item = RegisteredItem
+            for (let itemId in requests) {
+                let item = items[itemId]
+                let user = requests[itemId]
+                html += REQUEST_BLOCK_HTML
+                    .split(ITEM_ID_TAG).join(itemId)
+                    .split(EMAIL_TAG).join(user.email)
+                    .split(REASON_FOR_REQUEST_TAG).join(requestReasons[itemId])
+            }
+            //console.log(html)
+            return new Buffer(TemplatingEngine.replaceTags({[REQUEST_BLOCK_TAG]: html}, ADMIN_REQUESTS_LIST_FILE))
         }
         return new Buffer(TemplatingEngine.replaceTags({[ERROR_TAG]: "Access Denied"}, ERROR_FILE))
     }
