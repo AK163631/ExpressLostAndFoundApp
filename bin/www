@@ -7,9 +7,6 @@
 var app = require('../app');
 var debug = require('debug')('expressapp:server');
 var http = require('http');
-const {Item} = require("../model/item")
-const fs = require('fs')
-const path = require('path');
 
 /**
  * Get port from environment and store in Express.
@@ -85,23 +82,9 @@ function onError(error) {
  */
 
 function onListening() {
-    //purge all static item images
-    let dirPath = path.join(__dirname, "../webroot/static/images")
-    fs.readdir(dirPath, function (err, files) {
-        if (err) throw err
-        files.forEach(function (file, index) {
-            fs.unlinkSync(dirPath + "/" + file)
-        })
-        // purge all item documents in db
-        Item.deleteMany({}, (err, success) => {
-            if (err) throw err
-            var addr = server.address();
-            var bind = typeof addr === 'string'
-                ? 'pipe ' + addr
-                : 'port ' + addr.port;
-            debug('Listening on ' + bind);
-        })
-    })
-
-
+    var addr = server.address();
+    var bind = typeof addr === 'string'
+        ? 'pipe ' + addr
+        : 'port ' + addr.port;
+    debug('Listening on ' + bind);
 }

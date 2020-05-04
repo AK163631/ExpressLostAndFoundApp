@@ -182,11 +182,9 @@ app.get("/approve-request/:itemid", (req, res) => {
     let user = hasActiveSession(req)
     if (user) {
         if (user.user.accessLevel === 0) {
-            let confirmRequest = req.params.confirmRequest
             let itemId = req.params.itemid
             if (itemId) {
                 let item = items[itemId]
-                let requestingUser = requests[itemId]
                 // remove items
                 item.selfDelete()
                 delete requests[itemId]
